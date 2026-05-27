@@ -110,13 +110,13 @@ class PubMedQASample:
     context: str               # Context paragraphs joined into a readable block
     context_labels: list       # Section labels e.g. ["METHODS", "RESULTS"]
     long_answer: str           # Gold long-form answer
-    gold_label: str            # Gold label: yes | no | maybe
+    gold_label: str            # Gold label: yes | no
 
 
 @dataclass
 class CandidateResponse:
     """Structured answer produced by the candidate model."""
-    answer: str          # yes | no | maybe
+    answer: str          # yes | no
     reasoning: str       # Model's chain-of-thought explanation
     key_evidence: str    # Most important evidence from the context
     raw_content: str     # Raw text the API returned (for debugging)
@@ -191,16 +191,15 @@ You will receive a biomedical question and relevant context excerpts from PubMed
 
 Instructions:
 1. Carefully read the question and all provided context sections.
-2. Decide whether the answer is "yes", "no", or "maybe":
+2. Decide whether the answer is "yes" or "no":
    - "yes"   – the evidence clearly supports a positive answer.
    - "no"    – the evidence clearly contradicts or refutes the premise.
-   - "maybe" – the evidence is mixed, inconclusive, or insufficient.
 3. Write detailed reasoning grounded in the context.
 4. Quote or paraphrase the key evidence that most strongly supports your answer.
 
 Return ONLY valid JSON — no markdown fences, no extra keys:
 {
-  "answer": "<yes|no|maybe>",
+  "answer": "<yes|no>",
   "reasoning": "<your detailed explanation>",
   "key_evidence": "<the most important supporting evidence from the context>"
 }"""
@@ -212,11 +211,11 @@ answers to PubMedQA questions.
 You will receive:
   1. The biomedical research question.
   2. The relevant context excerpts.
-  3. The ground-truth answer label (yes / no / maybe).
+  3. The ground-truth answer label (yes / no).
   4. The candidate AI model's JSON response.
 
 Your task:
-  Step 1 – Identify the label the candidate gave (yes / no / maybe).
+  Step 1 – Identify the label the candidate gave (yes / no).
   Step 2 – Check whether it matches the ground-truth label.
   Step 3 – Read the context carefully and reason about whether the candidate's explanation \
 is scientifically sound and well-supported.
@@ -236,7 +235,7 @@ is scientifically sound and well-supported.
 
 Return ONLY valid JSON — no markdown fences, no extra keys:
 {
-  "candidate_label": "<yes|no|maybe>",
+  "candidate_label": "<yes|no>",
   "label_match": <true|false>,
   "verdict": "<correct|incorrect>",
   "reasoning": "<your detailed step-by-step evaluation>",
