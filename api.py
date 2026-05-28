@@ -46,11 +46,10 @@ class RunRequest(BaseModel):
     judge_deployment: str
     dataset_split: str = "pqa_labeled"
     dataset_partition: str = "train"
-    dataset_subset: str = ""
     max_samples: int = 10          # 0 = run all
     max_concurrent: int = 5
     trials: int = 3
-    output: str = "eval_results.json"
+    output: str = "results/eval_results.json"
     candidate_temperature: float = 0.0
     judge_temperature: float = 0.0
 
@@ -68,7 +67,6 @@ def get_config() -> dict:
         "judge_deployment":     env.get("JUDGE_DEPLOYMENT", ""),
         "dataset_split":        env.get("DATASET_SPLIT", "pqa_labeled"),
         "dataset_partition":    env.get("DATASET_PARTITION", "train"),
-        "dataset_subset":       env.get("DATASET_SUBSET", ""),
         "max_samples":          int(env.get("MAX_SAMPLES", 10) or 10),
         "max_concurrent":       int(env.get("MAX_CONCURRENT", 5)),
         "candidate_temperature": float(env.get("CANDIDATE_TEMPERATURE", 0.0)),
@@ -79,7 +77,9 @@ def get_config() -> dict:
 @app.get("/api/files")
 def list_files() -> list[str]:
     """Return sorted list of eval result filenames in the project root."""
-    return sorted(p.name for p in PROJECT_ROOT.glob("eval_results*.json"))
+    results_dir = PROJECT_ROOT / "results"
+    results_dir.mkdir(exist_ok=True)
+    return sorted(p.name for p in results_dir.iterdir() if p.is_file() and not p.name.startswith('.'))
 
 
 @app.get("/api/results/{filename}")
@@ -89,7 +89,7 @@ def get_results(filename: str) -> dict:
     if "/" in filename or "\\" in filename or ".." in filename:
         raise HTTPException(status_code=400, detail="Invalid filename.")
 
-    path = PROJECT_ROOT / filename
+    path = PROJECT_ROOT / "results" / filename
     if not path.exists():
         raise HTTPException(status_code=404, detail=f"File '{filename}' not found.")
 
@@ -118,15 +118,17 @@ def run_eval(req: RunRequest) -> StreamingResponse:
     cmd += ["--dataset-split",     req.dataset_split]
     cmd += ["--dataset-partition", req.dataset_partition]
 
-    if req.dataset_subset.strip():
-        cmd += ["--dataset-subset", req.dataset_subset.strip()]
-
     if req.max_samples > 0:
         cmd += ["--max-samples", str(req.max_samples)]
 
     cmd += ["--max-concurrent", str(req.max_concurrent)]
     cmd += ["--trials",         str(req.trials)]
-    cmd += ["--output",         req.output]
+
+    # Always route output into the results/ directory unless caller specified a path
+    output = req.output
+    if output and not Path(output).parent.parts:
+        output = f"results/{output}"
+    cmd += ["--output", output]
 
     # Pass temperatures as environment variables
     env = os.environ.copy()

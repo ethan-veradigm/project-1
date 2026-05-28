@@ -7,9 +7,18 @@ formats the context, and yields PubMedQASample objects ready for evaluation.
 
 from __future__ import annotations
 
+import os
+
 from datasets import load_dataset
+from huggingface_hub import login as hf_login
 
 from utils import EvalConfig, PubMedQASample
+
+
+def _hf_login_if_configured() -> None:
+    token = os.getenv("HF_TOKEN")
+    if token:
+        hf_login(token=token, add_to_git_credential=False)
 
 
 def _format_context(context_dict: dict) -> tuple[str, list]:
@@ -48,6 +57,7 @@ def load_pubmedqa(config: EvalConfig) -> list[PubMedQASample]:
     Returns:
         List of PubMedQASample objects.
     """
+    _hf_login_if_configured()
     print(
         f"Loading PubMedQA  split='{config.dataset_split}'  "
         f"partition='{config.dataset_partition}'  "

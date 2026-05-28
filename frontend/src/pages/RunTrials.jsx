@@ -6,20 +6,24 @@ const DEFAULT_FORM = {
   judgeDeployment: '',
   datasetSplit: 'pqa_labeled',
   datasetPartition: 'test',
-  datasetSubset: '',
   maxSamples: 0,
   maxConcurrent: 5,
   trials: 1,
-  output: 'results.jsonl',
+  output: '',
   candidateTemperature: 0.0,
   judgeTemperature: 0.0,
 }
+
+const DEPLOYMENTS = ['gpt-5.4-mini', 'gpt-5.5']
+const FORCED_TEMP_DEPLOYMENT = 'gpt-5.5'
+const PROGRESS_RE = /^PROGRESS:(\d+)\/(\d+)$/
 
 export default function RunTrials() {
   const [form, setForm] = useState(DEFAULT_FORM)
   const [running, setRunning] = useState(false)
   const [logLines, setLogLines] = useState([])
   const [exitCode, setExitCode] = useState(null)
+  const [progress, setProgress] = useState(null) // { done: N, total: M } | null
   const logRef = useRef(null)
 
   // Pre-fill form from backend config on mount
@@ -32,7 +36,6 @@ export default function RunTrials() {
           ...(cfg.judge_deployment != null && { judgeDeployment: cfg.judge_deployment }),
           ...(cfg.dataset_split != null && { datasetSplit: cfg.dataset_split }),
           ...(cfg.dataset_partition != null && { datasetPartition: cfg.dataset_partition }),
-          ...(cfg.dataset_subset != null && { datasetSubset: cfg.dataset_subset }),
           ...(cfg.max_samples != null && { maxSamples: cfg.max_samples }),
           ...(cfg.max_concurrent != null && { maxConcurrent: cfg.max_concurrent }),
           ...(cfg.trials != null && { trials: cfg.trials }),
@@ -55,16 +58,21 @@ export default function RunTrials() {
 
   function handleChange(e) {
     const { name, value, type } = e.target
-    setForm((prev) => ({
-      ...prev,
-      [name]: type === 'number' ? Number(value) : value,
-    }))
+    setForm((prev) => {
+      const updated = { ...prev, [name]: type === 'number' ? Number(value) : value }
+      if (name === 'candidateDeployment' && value === FORCED_TEMP_DEPLOYMENT)
+        updated.candidateTemperature = 1
+      if (name === 'judgeDeployment' && value === FORCED_TEMP_DEPLOYMENT)
+        updated.judgeTemperature = 1
+      return updated
+    })
   }
 
   async function handleRun(e) {
     e.preventDefault()
     setLogLines([])
     setExitCode(null)
+    setProgress(null)
     setRunning(true)
 
     const config = {
@@ -72,7 +80,6 @@ export default function RunTrials() {
       judge_deployment: form.judgeDeployment,
       dataset_split: form.datasetSplit,
       dataset_partition: form.datasetPartition,
-      dataset_subset: form.datasetSubset || null,
       max_samples: form.maxSamples,
       max_concurrent: form.maxConcurrent,
       trials: form.trials,
@@ -84,7 +91,14 @@ export default function RunTrials() {
     try {
       await startRun(
         config,
-        (line) => setLogLines((prev) => [...prev, line]),
+        (line) => {
+          const m = PROGRESS_RE.exec(line)
+          if (m) {
+            setProgress({ done: Number(m[1]), total: Number(m[2]) })
+          } else {
+            setLogLines((prev) => [...prev, line])
+          }
+        },
         (code) => {
           setExitCode(code)
           setRunning(false)
@@ -100,8 +114,10 @@ export default function RunTrials() {
   return (
     <>
       <div className="page-header">
-        <h1>Run Trials</h1>
-        <p className="page-subtitle">Configure and launch evaluation runs</p>
+        <div>
+          <h1>Run Trials</h1>
+          <p className="page-subtitle">Configure and launch evaluation runs</p>
+        </div>
       </div>
 
       <div className="card">
@@ -110,32 +126,39 @@ export default function RunTrials() {
             {/* ---- Left column ---- */}
             <div className="form-group">
               <label htmlFor="candidateDeployment">Candidate Deployment</label>
-              <input
+              <select
                 id="candidateDeployment"
                 name="candidateDeployment"
-                type="text"
                 value={form.candidateDeployment}
                 onChange={handleChange}
-                placeholder="e.g. gpt-4o"
                 required
-              />
+              >
+                <option value="">— Select —</option>
+                {DEPLOYMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
             </div>
 
             <div className="form-group">
               <label htmlFor="judgeDeployment">Judge Deployment</label>
-              <input
+              <select
                 id="judgeDeployment"
                 name="judgeDeployment"
-                type="text"
                 value={form.judgeDeployment}
                 onChange={handleChange}
-                placeholder="e.g. gpt-4o"
                 required
-              />
+              >
+                <option value="">— Select —</option>
+                {DEPLOYMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
             </div>
 
             <div className="form-group">
-              <label htmlFor="candidateTemperature">Candidate Temperature</label>
+              <label htmlFor="candidateTemperature">
+                Candidate Temperature
+                {form.candidateDeployment === FORCED_TEMP_DEPLOYMENT && (
+                  <span className="forced-temp-note"> (locked to 1)</span>
+                )}
+              </label>
               <input
                 id="candidateTemperature"
                 name="candidateTemperature"
@@ -145,11 +168,17 @@ export default function RunTrials() {
                 step="0.1"
                 value={form.candidateTemperature}
                 onChange={handleChange}
+                disabled={form.candidateDeployment === FORCED_TEMP_DEPLOYMENT}
               />
             </div>
 
             <div className="form-group">
-              <label htmlFor="judgeTemperature">Judge Temperature</label>
+              <label htmlFor="judgeTemperature">
+                Judge Temperature
+                {form.judgeDeployment === FORCED_TEMP_DEPLOYMENT && (
+                  <span className="forced-temp-note"> (locked to 1)</span>
+                )}
+              </label>
               <input
                 id="judgeTemperature"
                 name="judgeTemperature"
@@ -159,6 +188,7 @@ export default function RunTrials() {
                 step="0.1"
                 value={form.judgeTemperature}
                 onChange={handleChange}
+                disabled={form.judgeDeployment === FORCED_TEMP_DEPLOYMENT}
               />
             </div>
 
@@ -187,18 +217,6 @@ export default function RunTrials() {
                 <option value="train">train</option>
                 <option value="test">test</option>
               </select>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="datasetSubset">Dataset Subset</label>
-              <input
-                id="datasetSubset"
-                name="datasetSubset"
-                type="text"
-                value={form.datasetSubset}
-                onChange={handleChange}
-                placeholder="Leave blank for all"
-              />
             </div>
 
             <div className="form-group">
@@ -249,7 +267,8 @@ export default function RunTrials() {
                 type="text"
                 value={form.output}
                 onChange={handleChange}
-                placeholder="results.jsonl"
+                placeholder=""
+                required
               />
             </div>
           </div>
@@ -273,14 +292,37 @@ export default function RunTrials() {
         </form>
       </div>
 
-      {logLines.length > 0 && (
+      {(running || progress !== null || logLines.length > 0) && (
         <div className="card" style={{ padding: '1rem' }}>
           <div className="card-title" style={{ marginBottom: '0.75rem' }}>
             Live Output
           </div>
+
+          {progress !== null && (
+            <div className="progress-wrap">
+              <div className="progress-header">
+                <span>Evaluating samples</span>
+                <span className="progress-count">
+                  {progress.done} / {progress.total}
+                </span>
+              </div>
+              <div className="progress-track">
+                <div
+                  className="progress-fill"
+                  style={{ width: `${(progress.done / progress.total) * 100}%` }}
+                />
+              </div>
+              <div className="progress-pct">
+                {((progress.done / progress.total) * 100).toFixed(0)}%
+              </div>
+            </div>
+          )}
+
+          {logLines.length > 0 && (
           <div className="log-output" ref={logRef}>
             {logLines.join('\n')}
           </div>
+          )}
 
           {exitCode !== null && (
             <div

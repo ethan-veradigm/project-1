@@ -4,33 +4,25 @@
  *   entry   - a single result entry object from the results array
  *   onClose - callback to close / deselect the panel
  */
-export default function EntryDetail({ entry, onClose }) {
-  // ---- Normalise field names (support snake_case and camelCase) ----
-  function get(...keys) {
-    for (const k of keys) {
-      if (entry[k] != null) return entry[k]
-    }
-    return null
-  }
-
-  const pubmedId = get('pubmed_id', 'pubmedId', 'pmid') ?? '—'
-  const question = get('question') ?? ''
-  const context = get('context', 'full_text', 'fullText') ?? ''
+export default function EntryDetail({ entry, onClose, closeLabel = '✕ Close' }) {
+  const pubmedId = entry.pubid ?? '—'
+  const question = entry.question ?? ''
+  const context = entry.context ?? ''
 
   // Candidate fields
-  const candidateAnswer = get('candidate_answer', 'candidateAnswer') ?? ''
-  const candidateReasoning = get('candidate_reasoning', 'candidateReasoning', 'reasoning') ?? ''
-  const candidateEvidence = get('candidate_evidence', 'candidateEvidence', 'key_evidence', 'keyEvidence') ?? ''
+  const candidateAnswer = entry.candidate?.answer ?? ''
+  const candidateReasoning = entry.candidate?.reasoning ?? ''
+  const candidateEvidence = entry.candidate?.key_evidence ?? ''
 
   // Judge fields
-  const verdict = get('verdict') ?? ''
-  const labelMatch = get('label_match', 'labelMatch')
-  const qualityScore = get('quality_score', 'qualityScore')
-  const judgeReasoning = get('judge_reasoning', 'judgeReasoning') ?? ''
+  const verdict = entry.judge?.verdict ?? ''
+  const labelMatch = entry.judge?.label_match ?? null
+  const qualityScore = entry.judge?.quality_score ?? null
+  const judgeReasoning = entry.judge?.reasoning ?? ''
 
   // Gold
-  const goldLabel = get('gold_label', 'goldLabel', 'gold') ?? ''
-  const goldLongAnswer = get('gold_long_answer', 'goldLongAnswer', 'long_answer', 'longAnswer') ?? ''
+  const goldLabel = entry.gold_label ?? ''
+  const goldLongAnswer = entry.long_answer ?? ''
 
   // ---- Helper sub-components ----
   function AnswerBadge({ label }) {
@@ -69,7 +61,7 @@ export default function EntryDetail({ entry, onClose }) {
       <div className="entry-detail-header">
         <h3>PubMed ID: {pubmedId}</h3>
         <button className="btn btn-secondary" type="button" onClick={onClose}>
-          ✕ Close
+          {closeLabel}
         </button>
       </div>
 

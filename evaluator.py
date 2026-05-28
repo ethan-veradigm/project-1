@@ -15,7 +15,6 @@ import asyncio
 from typing import Sequence
 
 from openai import AsyncOpenAI
-from tqdm.asyncio import tqdm_asyncio
 
 from utils import EvalConfig, PubMedQASample, EvalResult
 from candidate import run_candidate
@@ -73,20 +72,28 @@ async def run_evaluation(
     )
 
     semaphore = asyncio.Semaphore(config.max_concurrent)
+    total = len(samples)
+
+    print(f"\nRunning evaluation on {total} samples "
+          f"(max_concurrent={config.max_concurrent}) ...", flush=True)
+
+    completed = 0
+    lock = asyncio.Lock()
+
+    async def tracked(coro):
+        nonlocal completed
+        result = await coro
+        async with lock:
+            completed += 1
+            print(f"PROGRESS:{completed}/{total}", flush=True)
+        return result
 
     tasks = [
-        _evaluate_one(semaphore, client, config, sample, i)
+        tracked(_evaluate_one(semaphore, client, config, sample, i))
         for i, sample in enumerate(samples)
     ]
 
-    print(f"\nRunning evaluation on {len(tasks)} samples "
-          f"(max_concurrent={config.max_concurrent}) ...")
-
-    results: list[EvalResult] = await tqdm_asyncio.gather(
-        *tasks,
-        desc="Evaluating",
-        unit="sample",
-    )
+    results: list[EvalResult] = await asyncio.gather(*tasks)
 
     await client.close()
     return results

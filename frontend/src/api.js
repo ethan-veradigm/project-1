@@ -62,9 +62,6 @@ export async function startRun(config, onLine, onDone) {
   const decoder = new TextDecoder('utf-8')
   let buffer = ''
 
-  // SSE parser state
-  let currentEvent = null
-
   while (true) {
     const { value, done } = await reader.read()
     if (done) break
@@ -79,31 +76,18 @@ export async function startRun(config, onLine, onDone) {
     for (const raw of lines) {
       const line = raw.trimEnd()
 
-      if (line.startsWith('event:')) {
-        currentEvent = line.slice('event:'.length).trim()
-      } else if (line.startsWith('data:')) {
+      if (line.startsWith('data:')) {
         const dataStr = line.slice('data:'.length).trim()
-
-        if (currentEvent === 'line') {
-          // dataStr is a JSON-encoded string
-          try {
-            const parsed = JSON.parse(dataStr)
-            onLine(typeof parsed === 'string' ? parsed : JSON.stringify(parsed))
-          } catch {
-            // If not valid JSON just pass it raw
-            onLine(dataStr)
+        try {
+          const parsed = JSON.parse(dataStr)
+          if (parsed.done) {
+            onDone(parsed.exit_code ?? 0)
+          } else if (parsed.line != null) {
+            onLine(String(parsed.line))
           }
-        } else if (currentEvent === 'done') {
-          try {
-            const parsed = JSON.parse(dataStr)
-            onDone(parsed.exit_code ?? parsed.exitCode ?? 0)
-          } catch {
-            onDone(0)
-          }
+        } catch {
+          if (dataStr) onLine(dataStr)
         }
-      } else if (line === '') {
-        // Empty line resets current event (end of SSE message)
-        currentEvent = null
       }
     }
   }
@@ -113,20 +97,15 @@ export async function startRun(config, onLine, onDone) {
     const line = buffer.trim()
     if (line.startsWith('data:')) {
       const dataStr = line.slice('data:'.length).trim()
-      if (currentEvent === 'line') {
-        try {
-          const parsed = JSON.parse(dataStr)
-          onLine(typeof parsed === 'string' ? parsed : JSON.stringify(parsed))
-        } catch {
-          onLine(dataStr)
+      try {
+        const parsed = JSON.parse(dataStr)
+        if (parsed.done) {
+          onDone(parsed.exit_code ?? 0)
+        } else if (parsed.line != null) {
+          onLine(String(parsed.line))
         }
-      } else if (currentEvent === 'done') {
-        try {
-          const parsed = JSON.parse(dataStr)
-          onDone(parsed.exit_code ?? parsed.exitCode ?? 0)
-        } catch {
-          onDone(0)
-        }
+      } catch {
+        if (dataStr) onLine(dataStr)
       }
     }
   }

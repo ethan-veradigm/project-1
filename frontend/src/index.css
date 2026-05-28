@@ -165,6 +165,11 @@ a:hover {
    ============================================================ */
 .page-header {
   margin-bottom: 1.75rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .page-header h1 {
@@ -299,6 +304,19 @@ a:hover {
   padding-right: 2rem;
 }
 
+.form-group input:disabled {
+  background: var(--color-table-head);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+.forced-temp-note {
+  font-weight: 400;
+  color: var(--color-primary);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
 .form-group input:focus,
 .form-group select:focus,
 .form-group textarea:focus {
@@ -399,6 +417,47 @@ a:hover {
 .log-output::-webkit-scrollbar-thumb {
   background: #334155;
   border-radius: 3px;
+}
+
+/* ============================================================
+   Progress Bar
+   ============================================================ */
+.progress-wrap {
+  margin-bottom: 1rem;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin-bottom: 0.4rem;
+}
+
+.progress-count {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.progress-track {
+  height: 10px;
+  background: var(--color-border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.progress-pct {
+  text-align: right;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  margin-top: 0.25rem;
 }
 
 /* ============================================================

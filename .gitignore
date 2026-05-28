@@ -3,5 +3,8 @@
 .env
 .env.*
 *.env
-__pycache__
-eval_results*.json
+__pycache__/
+*.json
+*.jsonl
+results/*
+!results/.gitkeep

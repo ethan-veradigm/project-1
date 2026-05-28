@@ -1,24 +1,29 @@
 import { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchFiles, fetchResults } from '../api.js'
-import EntryDetail from '../components/EntryDetail.jsx'
 
 const DEFAULT_FILTERS = {
   goldLabels: ['yes', 'no', 'maybe'],
   verdicts: ['correct', 'incorrect'],
-  statuses: ['success', 'candidate_error', 'judge_error'],
+  statuses: ['success'],
   minQuality: 1,
+}
+
+function normalizeStatus(status) {
+  const s = (status ?? 'success').toLowerCase()
+  return s === 'success' ? 'success' : 'error'
 }
 
 function computeSummaryMetrics(results) {
   if (!results || results.length === 0) {
     return { accuracy: 0, total: 0, avgQuality: 0, correct: 0, incorrect: 0 }
   }
-  const judged = results.filter((r) => r.verdict != null)
-  const correct = judged.filter((r) => r.verdict === 'correct').length
-  const incorrect = judged.filter((r) => r.verdict === 'incorrect').length
+  const judged = results.filter((r) => r.judge?.verdict != null)
+  const correct = judged.filter((r) => r.judge.verdict === 'correct').length
+  const incorrect = judged.filter((r) => r.judge.verdict === 'incorrect').length
   const accuracy = judged.length > 0 ? ((correct / judged.length) * 100).toFixed(1) : '0.0'
-  const qualityScores = results
-    .map((r) => r.quality_score ?? r.qualityScore)
+  const qualityScores = judged
+    .map((r) => r.judge?.quality_score)
     .filter((q) => q != null && !isNaN(q))
   const avgQuality =
     qualityScores.length > 0
@@ -36,13 +41,14 @@ function getLabel(entry, field, ...fallbacks) {
 }
 
 export default function ViewResults() {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [files, setFiles] = useState([])
-  const [selectedFile, setSelectedFile] = useState(null)
+  const [selectedFile, setSelectedFile] = useState(() => searchParams.get('file') ?? null)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
-  const [selectedEntryIndex, setSelectedEntryIndex] = useState(null)
 
   // Load file list on mount
   useEffect(() => {
@@ -53,12 +59,10 @@ export default function ViewResults() {
   useEffect(() => {
     if (!selectedFile) {
       setData(null)
-      setSelectedEntryIndex(null)
       return
     }
     setLoading(true)
     setError(null)
-    setSelectedEntryIndex(null)
     fetchResults(selectedFile)
       .then((d) => {
         setData(d)
@@ -87,25 +91,23 @@ export default function ViewResults() {
         : [...current, value]
       return { ...prev, [key]: next }
     })
-    setSelectedEntryIndex(null)
   }
 
   function setMinQuality(val) {
     setFilters((prev) => ({ ...prev, minQuality: Number(val) }))
-    setSelectedEntryIndex(null)
   }
 
   const allResults = data?.results ?? []
 
   const filteredResults = allResults.filter((entry) => {
-    const gold = getLabel(entry, 'gold_label', 'goldLabel', 'gold') ?? ''
-    const verdict = getLabel(entry, 'verdict') ?? ''
-    const status = getLabel(entry, 'status') ?? 'success'
-    const quality = getLabel(entry, 'quality_score', 'qualityScore') ?? 1
+    const gold = (entry.gold_label ?? '').toLowerCase()
+    const verdict = (entry.judge?.verdict ?? '').toLowerCase()
+    const status = normalizeStatus(entry.status)
+    const quality = entry.judge?.quality_score ?? 1
 
-    if (!filters.goldLabels.includes(gold.toLowerCase())) return false
-    if (verdict && !filters.verdicts.includes(verdict.toLowerCase())) return false
-    if (!filters.statuses.includes(status.toLowerCase())) return false
+    if (!filters.goldLabels.includes(gold)) return false
+    if (verdict && !filters.verdicts.includes(verdict)) return false
+    if (!filters.statuses.includes(status)) return false
     if (quality < filters.minQuality) return false
     return true
   })
@@ -139,8 +141,10 @@ export default function ViewResults() {
   return (
     <>
       <div className="page-header">
-        <h1>View Results</h1>
-        <p className="page-subtitle">Browse and analyze evaluation outputs</p>
+        <div>
+          <h1>View Results</h1>
+          <p className="page-subtitle">Browse and analyze evaluation outputs</p>
+        </div>
       </div>
 
       {/* File selector */}
@@ -254,7 +258,7 @@ export default function ViewResults() {
             <div className="filter-group">
               <label>Status</label>
               <div className="filter-checkboxes">
-                {['success', 'candidate_error', 'judge_error'].map((v) => (
+                {['success', 'error'].map((v) => (
                   <label key={v}>
                     <input
                       type="checkbox"
@@ -307,29 +311,21 @@ export default function ViewResults() {
                 </thead>
                 <tbody>
                   {filteredResults.map((entry, idx) => {
-                    const pubmedId =
-                      getLabel(entry, 'pubmed_id', 'pubmedId', 'pmid') ?? '—'
-                    const question =
-                      getLabel(entry, 'question') ?? ''
-                    const gold =
-                      getLabel(entry, 'gold_label', 'goldLabel', 'gold') ?? ''
-                    const candidateAnswer =
-                      getLabel(entry, 'candidate_answer', 'candidateAnswer') ?? ''
-                    const verdict =
-                      getLabel(entry, 'verdict') ?? ''
-                    const quality =
-                      getLabel(entry, 'quality_score', 'qualityScore')
-                    const labelMatch =
-                      getLabel(entry, 'label_match', 'labelMatch')
+                    const pubmedId = entry.pubid ?? '—'
+                    const question = entry.question ?? ''
+                    const gold = entry.gold_label ?? ''
+                    const candidateAnswer = entry.candidate?.answer ?? ''
+                    const verdict = entry.judge?.verdict ?? ''
+                    const quality = entry.judge?.quality_score ?? null
+                    const labelMatch = entry.judge?.label_match ?? null
 
-                    const isSelected = selectedEntryIndex === idx
+                    const globalIdx = allResults.indexOf(entry)
 
                     return (
                       <tr
                         key={idx}
-                        className={isSelected ? 'row-selected' : ''}
                         onClick={() =>
-                          setSelectedEntryIndex(isSelected ? null : idx)
+                          navigate(`/results/${encodeURIComponent(selectedFile)}/${globalIdx}`)
                         }
                       >
                         <td className="col-num">{idx + 1}</td>
@@ -368,13 +364,6 @@ export default function ViewResults() {
             </div>
           )}
 
-          {/* Entry detail panel */}
-          {selectedEntryIndex !== null && filteredResults[selectedEntryIndex] && (
-            <EntryDetail
-              entry={filteredResults[selectedEntryIndex]}
-              onClose={() => setSelectedEntryIndex(null)}
-            />
-          )}
         </>
       )}
     </>

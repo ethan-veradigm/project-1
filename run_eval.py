@@ -153,7 +153,8 @@ async def main() -> int:
     base   = config.output_path
     stem   = base.stem    # e.g. "eval_results"
     suffix = base.suffix  # e.g. ".json"
-    parent = base.parent  # e.g. Path(".")
+    parent = base.parent  # e.g. Path("results")
+    parent.mkdir(parents=True, exist_ok=True)
 
     # Sanitise model names so they're safe to use in filenames
     def _safe(name: str) -> str:
