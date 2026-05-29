@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import secrets
 import sys
 from pathlib import Path
 
@@ -158,14 +159,16 @@ async def main() -> int:
     parent = base.parent
     parent.mkdir(parents=True, exist_ok=True)
 
+    salt = secrets.token_hex(4)  # e.g. "a3f2c1d0" — prevents name collisions
+
     for trial in range(1, trials + 1):
         if trials > 1:
-            trial_path = parent / f"{stem}_{trial}.json"
+            trial_path = parent / f"{salt}_{stem}_{trial}.json"
             print(f"\n{'=' * 60}")
             print(f"  TRIAL {trial} of {trials}")
             print(f"{'=' * 60}")
         else:
-            trial_path = parent / f"{stem}.json"
+            trial_path = parent / f"{salt}_{stem}.json"
 
         config.output_path = trial_path
         results = await run_evaluation(config, samples)
