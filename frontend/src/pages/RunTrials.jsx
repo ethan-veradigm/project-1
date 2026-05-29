@@ -111,6 +111,11 @@ export default function RunTrials() {
     }
   }
 
+  const summaryLines = (() => {
+    const idx = logLines.findIndex((l) => l.startsWith('==='))
+    return idx === -1 ? [] : logLines.slice(idx)
+  })()
+
   return (
     <>
       <div className="page-header">
@@ -295,7 +300,7 @@ export default function RunTrials() {
       {(running || progress !== null || logLines.length > 0) && (
         <div className="card" style={{ padding: '1rem' }}>
           <div className="card-title" style={{ marginBottom: '0.75rem' }}>
-            Live Output
+            {exitCode === null ? 'Running…' : 'Results'}
           </div>
 
           {progress !== null && (
@@ -318,10 +323,10 @@ export default function RunTrials() {
             </div>
           )}
 
-          {logLines.length > 0 && (
-          <div className="log-output" ref={logRef}>
-            {logLines.join('\n')}
-          </div>
+          {exitCode !== null && summaryLines.length > 0 && (
+            <div className="log-output" ref={logRef}>
+              {summaryLines.join('\n')}
+            </div>
           )}
 
           {exitCode !== null && (

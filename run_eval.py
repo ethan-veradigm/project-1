@@ -151,27 +151,21 @@ async def main() -> int:
 
     # --- Run trials ----------------------------------------------------------
     base   = config.output_path
-    stem   = base.stem    # e.g. "eval_results"
-    suffix = base.suffix  # e.g. ".json"
-    parent = base.parent  # e.g. Path("results")
+    # Always use .json extension
+    if base.suffix.lower() != ".json":
+        base = base.with_suffix(".json")
+    stem   = base.stem
+    parent = base.parent
     parent.mkdir(parents=True, exist_ok=True)
-
-    # Sanitise model names so they're safe to use in filenames
-    def _safe(name: str) -> str:
-        return name.replace("/", "-").replace("\\", "-").replace(" ", "_")
-
-    candidate_tag = _safe(config.candidate_deployment)
-    judge_tag     = _safe(config.judge_deployment)
-    named_stem    = f"{stem}_{candidate_tag}_judge-{judge_tag}"
 
     for trial in range(1, trials + 1):
         if trials > 1:
-            trial_path = parent / f"{named_stem}_{trial}{suffix}"
+            trial_path = parent / f"{stem}_{trial}.json"
             print(f"\n{'=' * 60}")
             print(f"  TRIAL {trial} of {trials}")
             print(f"{'=' * 60}")
         else:
-            trial_path = parent / f"{named_stem}{suffix}"
+            trial_path = parent / f"{stem}.json"
 
         config.output_path = trial_path
         results = await run_evaluation(config, samples)

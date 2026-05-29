@@ -44,7 +44,7 @@ class EvalConfig:
     request_timeout: int = 60            # seconds per API call
 
     # Output
-    output_path: Path = Path("results/eval_results.json")
+    output_path: Path = Path("results/results.json")
 
     @classmethod
     def from_env(cls, env_file: str = ".env") -> "EvalConfig":

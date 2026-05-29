@@ -49,7 +49,7 @@ class RunRequest(BaseModel):
     max_samples: int = 10          # 0 = run all
     max_concurrent: int = 5
     trials: int = 3
-    output: str = "results/eval_results.json"
+    output: str = "results/results.json"
     candidate_temperature: float = 0.0
     judge_temperature: float = 0.0
 
